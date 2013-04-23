@@ -20,7 +20,6 @@
  *
  * @version	$Id: apache_check.php 669 2012-02-23 21:39:03Z mduncan $
  */
-
 require("Apache.lib.php");
 require("XmlRules.lib.php");
 //TODO Intro ErrorHandler class to this project!
@@ -44,43 +43,52 @@ function help()  {
 if($argc == 0)
   help();
 
+$verbose = false;
 $rules_filename = dirname(__FILE__) ."/../rules/centos-rhel-httpd.xml";
-$options = getopt("f:x:r:");  
+$options = getopt("f:x:r:v");  
 $file = (isset($options["f"]) ? $options["f"] : null);
 if(is_null($file) || (! file_exists($file)))
   help();
 
+if(isset($options["v"]))
+  $verbose = true;
 
 if(isset($options["x"]))  {
   $rules_filename = $options["x"];
-  echo "** Using XML rule set at ". $rules_filename ."\n";
+  if($verbose) 
+  	echo "** Using XML rule set at ". $rules_filename ."\n";
+  
 }
 
 if(isset($options["r"]))  {
   define("APACHE_SERVER_ROOT", $options["r"]);
-  echo "** Overriding ServerRoot value with '". $options["r"] ."'.\n";
+  if($verbose)
+  	echo "** Overriding ServerRoot value with '". $options["r"] ."'.\n";
+  
 }
 
-echo "Parsing ". $file .", please wait...";
+//echo "Parsing ". $file .", please wait...";
 $p = new ConfigurationParser($file);
 $c = $p->parse();
-echo "done.\n";
+//echo "done.\n";
 
-echo "Parsing included configuration file(s), please wait...";
+//echo "Parsing included configuration file(s), please wait...";
 $c->parseIncludedFiles();
-echo "done.\n";
+//echo "done.\n";
 
-echo "Parsing rules from ". $rules_filename .", please wait...";
+//echo "Parsing rules from ". $rules_filename .", please wait...";
 $xml = XmlRulesParser::parse($rules_filename);
-echo "done.\n";
+//echo "done.\n";
 
-echo "Checking Apache configuration against rule set (". $xml->count() ." rules)...\n";
+if($verbose) 
+	echo "Checking Apache configuration against rule set: ". basename($rules_filename) ." (". $xml->count() ." rules)\n";
+
 $i = 1;
 $score = 0;
 $errors = array();
 foreach($xml as $rule)  {
   if(strcasecmp($rule["type"], "module") == 0)  {
-    echo $i .". Checking for module: ". $rule["name"] ."...";
+    //echo $i .". Checking for module: ". $rule["name"] ."...";
     $loadmodules = $c->find("loadmodule");
     $found = false;
     foreach($loadmodules as $d)  {
@@ -91,17 +99,17 @@ foreach($xml as $rule)  {
       
     }    
     
-    echo "done.\n";
+    //echo "done.\n";
     if($found)  {
       array_push($errors, $rule["message"] ." ". $rule["resolution"] ." (". $rule["level"] .")");
       $score += $rule["level"];
     }
     
   }else if(strcasecmp($rule["type"], "directive") == 0)  {
-    echo $i .". Checking value of directive: ". $rule["name"] ."...";
+    //echo $i .". Checking value of directive: ". $rule["name"] ."...";
     $dd = $c->find($rule["name"]);
-    if(count($dd) == 0)
-      echo "no directive found...";
+    //if(count($dd) == 0)
+      //echo "no directive found...";
     
     $ok = false;
     foreach($dd as $d)  {
@@ -111,7 +119,7 @@ foreach($xml as $rule)  {
       
     }
     
-    echo "done.\n";
+    //echo "done.\n";
     if(! $ok)  {
       array_push($errors, $rule["message"] ." ". $rule["resolution"] ." (". $rule["level"] .")");
       $score += $rule["level"];
@@ -121,19 +129,23 @@ foreach($xml as $rule)  {
   $i++;
 }
 
-echo "\n** Audit completed. Score = ". $score ."\n";
-echo "Server Info\n--------------------------------------\n";
-echo "Root:   ". $c->getServerRoot() ."\n";
-echo "User:   ". $c->getUser() ."\n";
-echo "Group:  ". $c->getGroup() ."\n";
+if($verbose)  {
+  echo "\n** Audit completed. Score = ". $score ."\n";
+  echo "Server Info\n--------------------------------------\n";
+  echo "Root:   ". $c->getServerRoot() ."\n";
+  echo "User:   ". $c->getUser() ."\n";
+  echo "Group:  ". $c->getGroup() ."\n";
+}
 
 $ports = array();
 foreach($c->getPorts() as $port)
   array_push($ports, $port->getValuesAsString());
   
-echo "Listen: ". join(", ", $ports) ."\n\n";
+if($verbose) echo "Listen: ". join(", ", $ports) ."\n\n";
 
 foreach($errors as $error)
-  echo "* ". $error ."\n";
+  if($verbose) 
+    echo "* ". $error ."\n";
 
+exit($score);
 ?>
