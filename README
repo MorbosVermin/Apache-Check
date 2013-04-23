@@ -1,0 +1,57 @@
+Apache Check
+===============================================
+http://github.com/MorbosVermin/Apache-Check
+
+A small, PHP-based library and application to check Apache configurations
+for common security issues. The script loads a XML-based ruleset (by
+default rhel-centos-based Apache configurations) and then uses a library
+to parse the Apache configuration and check the directives parsed.
+
+This script can be added to a continuous build process using tools like 
+Jenkins. The normal output of the script is suppressed for this reason, but 
+the return/exit code indicates the score of the audit.
+
+  o src/Apache.lib.php:    Library to parse Apache configurations.
+  o src/XmlRules.lib.php:  Small XML library for the XML-based ruleset(s).
+  o src/apache_check.php:  Apache-Check script/application
+
+>> Usage
+
+  # apache-check -f <path to httpd.conf>
+  (Results will not be displayed, 'echo $?' to see return code indicating score)
+  
+  # apache-check -f <path> -v
+  (Verbose output including score)
+  
+  # apache-check -f <path> [-r <alternate ServerRoot>] [-v [> results.log]]
+  # apache-check -h
+
+>> Results and Scores
+
+At the end of the audit process, you will be presented with a score and any issues 
+found. The score is cumulative and should not be relied upon as a "end-all" for 
+Security checks. However, this tool will catch many common issues with Apache 
+configurations and the score should be used to indicate these common issues. 
+
+  1-4 - Non-critical, can be ignored most of the time.
+  5-8 - Medium criticality
+  9+  - High criticality. 
+
+  
+>> XML Rules
+
+This tool uses an XML file to load rules which will be processed on the 
+configuration(s) parsed. You can create new XML rule sets by following the general 
+rule of the centos-rhel-httpd.xml file given. 
+
+To run the tool with an alternative rule set...
+
+  # apache_check.php -f <path> -x <path to XML rule set file>
+  
+>> Bugs, Issues...
+
+Please enter any bugs/requests at...
+https://github.com/MorbosVermin/Apache-Check/issues
+
+Thanks.
+MikeD

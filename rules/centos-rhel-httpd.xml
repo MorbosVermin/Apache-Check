@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+	Apache-Check: Rules for CentOS/RHEL 6+ httpd (Apache) 
+	Copyright (c)2012 Mike Duncan <mike.duncan@waitwha.com>
+	
+	This program is free software; you can redistribute it and/or
+	modify it under the terms of the GNU General Public License
+	as published by the Free Software Foundation; either version 2
+	of the License, or (at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program; if not, write to the Free Software
+	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+	
+	@version 	$Id: centos-rhel-httpd.xml 671 2012-02-23 21:41:15Z mduncan $	
+-->
+<rules>
+	
+	<rule type="module" name="mod_proxy.so" 
+		level="3" 
+		message="ModProxy is enabled. This should only be enabled for proxying hosts."
+		resolution="Disable this module by commenting out the appropriate 'LoadModule mod_proxy.so...' line." />
+		
+	<rule type="module" name="mod_suexec.so"
+		level="4"
+		message="ModSuexec is enabled. This should not be enabled except in approved hosts."
+		resolution="Disable this module by commenting out the appropriate 'LoadModule mod_suexec.so...' line." />
+	
+	<rule type="module" name="mod_userdir.so"
+		level="4"
+		message="ModUserDir is enabled. This should never be enabled on production servers."
+		resolution="Disable this module by commenting out the appropriate 'LoadModule mod_userdir.so...' line." />
+	
+	<rule type="directive" name="ServerTokens" value="/^(OS|Full|Min|Major)/"
+		level="3"
+		message="ServerTokens directive is not correctly set. Users can view the version and sometimes modules being used with this instance of Apache."
+		resolution="Find and change the value for the ServerTokens directive to 'Prod'." />
+		
+	<rule type="directive" name="Alias" value="/^\/icons/" 
+		level="1"
+		message="The default /icons alias is enabled. This could allow someone to fingerprint this version of Apache."
+		resolution="You should disable all unnecessary Alias directives but most importantly the /icons and /errors aliases." />
+		
+	<rule type="directive" name="Alias" value="/^\/errors/"
+		level="1"
+		message="The default /errors alias is enabled. This could allow someone to fingerprint this version of Apache."
+		resolution="You should disable all unnecessary Alias directives but most importantly the /icon and /error aliases." />
+	
+	<rule type="directive" name="User" value="/^root/"
+		level="5"
+		message="The user Apache will run-as is 'root'. This could allow attackers to execute system functionality via Apache."
+		resolution="Set the User directive to a lower-level privileged user account (i.e. apache, www-data, etc)." />
+		
+	<rule type="directive" name="Group" value="/^root/"
+		level="5"
+		message="The group Apache will run-as is 'root'. This could allow attackers to execute system functionality via Apache."
+		resolution="Set the Group directive to a lower-level privileged group account (i.e. apache, www-data, etc)." />
+	
+</rules>
