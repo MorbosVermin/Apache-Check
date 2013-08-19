@@ -15,7 +15,8 @@ the return/exit code indicates the score of the audit.
   o src/XmlRules.lib.php:  Small XML library for the XML-based ruleset(s).
   o src/apache_check.php:  Apache-Check script/application
 
->> Usage
+Usage
+=================
 
   # apache-check -f <path to httpd.conf>
   (Results will not be displayed, 'echo $?' to see return code indicating score)
@@ -26,19 +27,23 @@ the return/exit code indicates the score of the audit.
   # apache-check -f <path> [-r <alternate ServerRoot>] [-v [> results.log]]
   # apache-check -h
 
->> Results and Scores
+Results and Scores
+=================
 
 At the end of the audit process, you will be presented with a score and any issues 
 found. The score is cumulative and should not be relied upon as a "end-all" for 
 Security checks. However, this tool will catch many common issues with Apache 
 configurations and the score should be used to indicate these common issues. 
 
-  1-4 - Non-critical, can be ignored most of the time.
-  5-8 - Medium criticality
-  9+  - High criticality. 
+1-4 - Non-critical, can be ignored most of the time.
+  
+5-8 - Medium criticality
+  
+9+  - High criticality. 
 
   
->> XML Rules
+XML Rules
+=================
 
 This tool uses an XML file to load rules which will be processed on the 
 configuration(s) parsed. You can create new XML rule sets by following the general 
@@ -48,7 +53,9 @@ To run the tool with an alternative rule set...
 
   # apache_check.php -f <path> -x <path to XML rule set file>
   
->> Bugs, Issues...
+
+Bugs, Issues...
+=================
 
 Please enter any bugs/requests at...
 https://github.com/MorbosVermin/Apache-Check/issues
