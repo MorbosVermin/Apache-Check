@@ -12,7 +12,9 @@ Jenkins. The normal output of the script is suppressed for this reason, but
 the return/exit code indicates the score of the audit.
 
   o src/Apache.lib.php:    Library to parse Apache configurations.
+  
   o src/XmlRules.lib.php:  Small XML library for the XML-based ruleset(s).
+  
   o src/apache_check.php:  Apache-Check script/application
 
 Usage
