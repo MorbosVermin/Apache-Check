@@ -24,11 +24,12 @@ Usage
 
   (Results will not be displayed, 'echo $?' to see return code indicating score)
   
-  # apache-check -f <path> -v
+  # apache-check -f &lt;path&gt; -v
+  
   (Verbose output including score)
   
-  # apache-check -f <path> [-r <alternate ServerRoot>] [-v [> results.log]]
-  # apache-check -h
+  # apache-check -f &lt;path&gt; [-r &lt;alternate ServerRoot&gt;] [-v [&gt; results.log]]
+  
 
 Results and Scores
 =================
@@ -54,7 +55,7 @@ rule of the centos-rhel-httpd.xml file given.
 
 To run the tool with an alternative rule set...
 
-  # apache_check.php -f <path> -x <path to XML rule set file>
+  # apache_check.php -f &lt;path&gt; -x &lt;path to XML rule set file&gt;
   
 
 Bugs, Issues...
