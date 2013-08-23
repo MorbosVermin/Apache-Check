@@ -20,7 +20,8 @@ the return/exit code indicates the score of the audit.
 Usage
 =================
 
-  # apache-check -f <path to httpd.conf>
+  # apache-check -f &lt;path to httpd.conf&gt;
+
   (Results will not be displayed, 'echo $?' to see return code indicating score)
   
   # apache-check -f <path> -v
