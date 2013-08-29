@@ -20,76 +20,78 @@
  *
  * @version	$Id: apache_check.php 669 2012-02-23 21:39:03Z mduncan $
  */
-require("Apache.lib.php");
-require("XmlRules.lib.php");
-//TODO Intro ErrorHandler class to this project!
-ini_set("display_errors", "1");
 ini_set("log_errors", "0");
 ini_set("error_log", "");
+ini_set("include_path", ini_get("include_path") .":". dirname(__FILE__));
 error_reporting(E_ALL ^E_NOTICE);
-//require("ErrorHandler.class.php");
-//set_error_handler(array("ErrorHandler", "handle"));
+
+require_once("Apache.lib.php");
+require_once("XmlRules.lib.php");
+require_once("ErrorHandler.class.php");
+set_error_handler(array("ErrorHandler", "handle"));
 
 function help()  {
   global $rules_filename;
-  echo "Syntax: [php] apache_check.php -f <path> [-x <path>] [-r <path>]\n";
+  echo "Syntax: [php] apache_check.php [-v] -f <path> [-x <path>] [-r <path>] [-l <log file>]\n";
   echo "Options:\n";
   echo "  -f <path> Required, the Apache configuration file to parse.\n";
   echo "  -x <path> Optional, an alternative XML rule set file (default = ". $rules_filename .")\n";
-  echo "  -r <path> Optional, use an alternative ServerRoot (default is derived from ServerRoot directive).\n\n"; 
+  echo "  -r <path> Optional, use an alternative ServerRoot (default is derived from ServerRoot directive).\n"; 
+  echo "  -l <path> Optional, log to file at path given.\n";
+  echo "  -d        Optional, enables debug messages helpful in troubleshooting issues.\n";
+  echo "  -v        Optional, enabled more verbosity.\n\n";
   exit(1);
 }
 
 if($argc == 0)
   help();
 
-$verbose = false;
 $rules_filename = dirname(__FILE__) ."/../rules/centos-rhel-httpd.xml";
-$options = getopt("f:x:r:v");  
+$options = getopt("l:f:x:r:vd");
 $file = (isset($options["f"]) ? $options["f"] : null);
 if(is_null($file) || (! file_exists($file)))
   help();
+  
+if(isset($options["d"]))
+  ErrorHandler::$debugMode = true;
 
-if(isset($options["v"]))
-  $verbose = true;
+if(isset($options["v"]))  {
+  ErrorHandler::$verbose = true;  
+  
+}else if(isset($options["l"]))  {
+  ini_set("log_errors", "1");
+  ini_set("error_log", $options["l"]);
+}
 
 if(isset($options["x"]))  {
   $rules_filename = $options["x"];
-  if($verbose) 
-  	echo "** Using XML rule set at ". $rules_filename ."\n";
-  
+  ErrorHandler::debug("Using XML rule-set located at ". $rules_filename);  
 }
 
 if(isset($options["r"]))  {
   define("APACHE_SERVER_ROOT", $options["r"]);
-  if($verbose)
-  	echo "** Overriding ServerRoot value with '". $options["r"] ."'.\n";
-  
+  ErrorHandler::debug("Overriding ServerRoot value with '". $options["r"] ."'");
 }
 
-//echo "Parsing ". $file .", please wait...";
+$start_time = date("U");
+ErrorHandler::info("Parsing Apache configuration file ". $file);
 $p = new ConfigurationParser($file);
-$c = $p->parse();
-//echo "done.\n";
+$config = $p->parse();
+$config->parseIncludedFiles();
+$end_time = date("U");
+ErrorHandler::debug("Completed parsing Apache configuration file(s) in ". ($end_time - $start_time) ."s");
 
-//echo "Parsing included configuration file(s), please wait...";
-$c->parseIncludedFiles();
-//echo "done.\n";
-
-//echo "Parsing rules from ". $rules_filename .", please wait...";
 $xml = XmlRulesParser::parse($rules_filename);
-//echo "done.\n";
-
-if($verbose) 
-	echo "Checking Apache configuration against rule set: ". basename($rules_filename) ." (". $xml->count() ." rules)\n";
+ErrorHandler::info("Checking ". count($config->getDirectives()) ." directive(s) for issues using rule-set '". basename($rules_filename) ."' (". $xml->count() ." rules)");
 
 $i = 1;
 $score = 0;
 $errors = array();
 foreach($xml as $rule)  {
+  ErrorHandler::debug("Processing rule '". $rule["name"] ."' (". $rule["type"] .")");
+  
   if(strcasecmp($rule["type"], "module") == 0)  {
-    //echo $i .". Checking for module: ". $rule["name"] ."...";
-    $loadmodules = $c->find("loadmodule");
+    $loadmodules = $config->find("loadmodule");
     $found = false;
     foreach($loadmodules as $d)  {
       $s = $d->getValues();
@@ -99,53 +101,75 @@ foreach($xml as $rule)  {
       
     }    
     
-    //echo "done.\n";
     if($found)  {
+      ErrorHandler::debug("Found LoadModule directive for module '". $rule["name"] ."' (". $rule["level"] .")");
       array_push($errors, $rule["message"] ." ". $rule["resolution"] ." (". $rule["level"] .")");
       $score += $rule["level"];
     }
+    
     
   }else if(strcasecmp($rule["type"], "directive") == 0)  {
-    //echo $i .". Checking value of directive: ". $rule["name"] ."...";
-    $dd = $c->find($rule["name"]);
-    //if(count($dd) == 0)
-      //echo "no directive found...";
-    
+    $dd = $config->find($rule["name"]);
     $ok = false;
-    foreach($dd as $d)  {
-      $ok = (! (preg_match($rule["value"], $d->getValuesAsString())));
-      if(! $ok)
-        break;
+    $d2 = null;
+    foreach($dd as $d2)  {
+      if(is_null($d2))
+        continue;
       
+      ErrorHandler::debug("Testing directive '". $d2->getName() ."' for value(s): ". $rule["value"]);
+      $ok = (preg_match($rule["value"], $d2->getValuesAsString()));
+      if($ok)  {
+        ErrorHandler::debug("Directive '". $d2->getName() ."' matched value(s) for rule '". $rule["name"] ."'");
+        break;
+      }
     }
     
-    //echo "done.\n";
-    if(! $ok)  {
+    if($ok)  {
       array_push($errors, $rule["message"] ." ". $rule["resolution"] ." (". $rule["level"] .")");
       $score += $rule["level"];
     }
+    
   }
   
   $i++;
 }
 
-if($verbose)  {
-  echo "\n** Audit completed. Score = ". $score ."\n";
-  echo "Server Info\n--------------------------------------\n";
-  echo "Root:   ". $c->getServerRoot() ."\n";
-  echo "User:   ". $c->getUser() ."\n";
-  echo "Group:  ". $c->getGroup() ."\n";
-}
+ErrorHandler::info("Completed audit. Score = ". $score);
 
 $ports = array();
-foreach($c->getPorts() as $port)
+foreach($config->getPorts() as $port)
   array_push($ports, $port->getValuesAsString());
-  
-if($verbose) echo "Listen: ". join(", ", $ports) ."\n\n";
 
-foreach($errors as $error)
-  if($verbose) 
-    echo "* ". $error ."\n";
+if(ErrorHandler::$verbose && !ErrorHandler::$debugMode)  {
+  echo "\n";
+  echo "Audit Results\n-----------------------------------------------------------------\n";
+  echo "Audit Score:    ". $score ."\n";
+  echo "Server Root:    ". $config->getServerRoot() ."\n";
+  echo "Server Port(s): ". join(", ", $ports) ."\n";
+  echo "User/Group:     ". $config->getUser() ."/". $config->getGroup() ."\n\n";
+  echo "\n";
+  foreach($errors as $error)  {
+    $level = "LOW";
+    $l = substr($error, strlen($error) - 2, strlen($error));
+    switch($l)  {
+      case 4:
+      case 5:
+      case 6:
+        $level = "MEDIUM";
+        break;
+        
+      case 6:
+      case 7:
+      case 8:
+        $level = "HIGH";
+        break;
+    }
+    
+    echo sprintf("[%s] %s\n", $level, $error);
+  }
+  
+  echo "\n";
+}
 
 exit($score);
 ?>
