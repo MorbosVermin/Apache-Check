@@ -26,7 +26,7 @@ ini_set("include_path", ini_get("include_path") .":". dirname(__FILE__));
 error_reporting(E_ALL ^E_NOTICE);
 
 //You may need to change this value depending on your site's physical location.
-date_default_timezone_set("America/NewYork");
+date_default_timezone_set("America/New_York");
 
 require_once("Apache.lib.php");
 require_once("XmlRules.lib.php");
