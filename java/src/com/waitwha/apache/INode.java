@@ -14,6 +14,7 @@ import java.util.ArrayList;
  */
 public interface INode {
 
+	public String getName();
 	public boolean isDirective();
 	public ArrayList<INode> children();
 	

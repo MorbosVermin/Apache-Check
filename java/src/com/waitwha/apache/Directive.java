@@ -24,6 +24,7 @@ public class Directive extends ArrayList<String> implements INode {
 		this.name = name;
 	}
 	
+	@Override
 	public String getName()  {
 		return this.name;
 	}

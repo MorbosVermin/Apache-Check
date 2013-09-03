@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,32 +26,145 @@ import com.waitwha.logging.LogManager;
 public class Configuration extends ArrayList<INode> {
 
 	private static final long serialVersionUID = 1L;
-	private static final Pattern COMMENT_LINE = Pattern.compile("^#");
-	private static final Pattern CONTAINER_START_LINE = Pattern.compile("^<([a-zA-Z0-9\\-_]) ");
-	private static final Pattern CONTAINER_END_LINE = Pattern.compile("^</([a-zA-Z0-9\\-_]) ");
+	private static final Pattern COMMENT_LINE = Pattern.compile("^[\\s*]?#.*");
+	private static final Pattern DIRECTIVE_LINE = Pattern.compile("^[\\s*]?([a-zA-Z]*)\\s*(.*)");
+	private static final Pattern CONTAINER_START_LINE = Pattern.compile("^[\\s*]?<([a-zA-Z]*)\\s*(.*)>");
+	private static final Pattern CONTAINER_END_LINE = Pattern.compile("^[\\s*]?</([a-zA-Z]*)>");
 	private static final Logger log = LogManager.getLogger(Configuration.class.getName());
 
+	private boolean continuation;
+	
 	private Configuration(String path, boolean includeFiles) throws ConfigurationParsingException, IOException {
 		super();
 		File configFile = new File(path);
 		if(!configFile.exists())
 			throw new FileNotFoundException("The file '"+ path +"' could not be found.");
 		
+		//Add global container
+		this.add(new Container());
+		
+		this.continuation = false;
+		int lineNum = 0;
+		log.info("Reading configuration file at '"+ path +"'");
 		try (BufferedReader br = new BufferedReader(new FileReader(path))) {
 			String line = null;
-			int lineNum = 0;
 			while((line = br.readLine()) != null)  {
 				lineNum++;
 				line = line.trim();
 				if(COMMENT_LINE.matcher(line).matches())
 					continue;
 				
-				Matcher m = CONTAINER_START_LINE.matcher(line);
-				if(m.matches())  {
-					
-				}
+				log.fine("Parsing: "+ line +" (line "+ lineNum +" from "+ path +")");
+				addLine(line);
 			}
 		}
+		
+		if(includeFiles)  {
+			ArrayList<INode> includes = this.getNodesByName("Include");
+			log.info("Parsing additional/included configuration(s): "+ includes.size());
+			for(INode include : includes)  {
+				Configuration c = Configuration.getInstance(((Directive)include).getValuesAsString(), includeFiles);
+				this.addAll(c);
+			}
+		}
+		
+		log.fine("Completed reading/parsing configuration file at '"+ path +"'. Read "+ lineNum +" line(s).");
+	}
+	
+	/**
+	 * Returns the last opened Container appended to the Configuration or the global Container.
+	 *  
+	 * @return Container
+	 */
+	private Container getLastContainer()  {
+		Container root = (Container)this.get(0);
+		Container lContainer = null;
+		
+		for(INode node : root)  {
+			if(!node.isDirective() && ((Container)node).isOpen())  {
+				lContainer = (Container)node;
+			}
+		}
+		
+		return (lContainer != null) ? lContainer : root;
+	}
+	
+	/**
+	 * Returns the INode implementation (i.e. Directive or Container) objects 
+	 * within this Configuration by the given name. Remember, Apache does not
+	 * enforce naming so it is highly possible to override your proviously set
+	 * directive/container with a later defined one. Additionally, some
+	 * settings can be appended to as with the Port directive.
+	 * 
+	 * @param name	Name of the directive/container objects to return.
+	 * @return	ArrayList<INode>
+	 */
+	private ArrayList<INode> getNodesByName(String name)  {
+		ArrayList<INode> nodes = new ArrayList<INode>();
+		for(INode node : (Container)this.get(0))  {
+			if(node.getName().equals(name))
+				nodes.add(node);
+			
+		}
+		
+		return nodes;
+	}
+	
+	/**
+	 * Processes a line from the configuration file which is not a commented one.
+	 * 
+ * @param line	A non-commented line within the configuration file.
+	 */
+	private void addLine(String line)  {
+		if(line.length() == 0)
+			return;
+		
+		//If this is a closing container line, close the last Container object.
+		if(CONTAINER_END_LINE.matcher(line).matches())  {
+			Container c = this.getLastContainer();
+			log.fine("Closing container: "+ c.getName() +" ("+ line +")");
+			c.close();
+			return;
+		}
+		
+		//If this is a continuation of another line...
+		if(continuation)  {
+			INode n = this.get(this.size() - 1);
+			log.info("Appending to directive/container: "+ n.getName());
+			if(n.isDirective())
+				((Directive)n).add(line);
+			else
+				((Container)n).addValue(line);
+			
+			this.continuation = line.endsWith("\\");
+			return;
+		}
+		
+		/*
+		 * Start processing of Directive or Container line.
+		 */
+		INode node = null;
+		Matcher m = CONTAINER_START_LINE.matcher(line);
+		if(m.matches())  {
+			node = new Container(m.group(1));
+			if(m.groupCount() >= 1)
+				for(int i = 2; i < m.groupCount(); i++)
+					((Container)node).addValue(m.group(i));
+			
+		}else if((m = DIRECTIVE_LINE.matcher(line)).matches())  {
+			node = new Directive(m.group(1));
+			if(m.groupCount() >= 1)
+				for(int i = 2; i < m.groupCount(); i++)
+					((Directive)node).add(m.group(i));
+			
+		}
+		
+		if(node != null)
+			this.getLastContainer().add(node);
+		else
+			log.warning("Could not parse configuration line: "+ line);
+		
+		this.continuation = line.endsWith("\\");
 	}
 	
 	/**
@@ -82,7 +196,15 @@ public class Configuration extends ArrayList<INode> {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-
+		LogManager.APP_NAME = "apache-check";
+		try  {
+			Configuration c = Configuration.getInstance(args[0]);
+			log.info("Parsed configuration successfully: "+ c.get(0).children().size() +" nodes.");
+			
+		}catch(Exception e) {
+			e.printStackTrace();
+			
+		}
 	}
 
 }
