@@ -52,4 +52,9 @@ public class Directive extends ArrayList<String> implements INode {
 		return null;
 	}
 
+	@Override
+	public ArrayList<INode> search(String name)  {
+		return null;
+	}
+	
 }

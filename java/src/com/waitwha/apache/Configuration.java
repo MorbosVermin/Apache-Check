@@ -23,15 +23,16 @@ import com.waitwha.logging.LogManager;
  * @version $Id$
  * @package com.waitwha.apache
  */
-public class Configuration extends ArrayList<INode> {
+public class Configuration {
 
-	private static final long serialVersionUID = 1L;
 	private static final Pattern COMMENT_LINE = Pattern.compile("^[\\s*]?#.*");
 	private static final Pattern DIRECTIVE_LINE = Pattern.compile("^[\\s*]?([a-zA-Z]*)\\s*(.*)");
 	private static final Pattern CONTAINER_START_LINE = Pattern.compile("^[\\s*]?<([a-zA-Z]*)\\s*(.*)>");
 	private static final Pattern CONTAINER_END_LINE = Pattern.compile("^[\\s*]?</([a-zA-Z]*)>");
 	private static final Logger log = LogManager.getLogger(Configuration.class.getName());
 
+	private Container global;
+	private String serverRoot;
 	private boolean continuation;
 	
 	private Configuration(String path, boolean includeFiles) throws ConfigurationParsingException, IOException {
@@ -41,7 +42,7 @@ public class Configuration extends ArrayList<INode> {
 			throw new FileNotFoundException("The file '"+ path +"' could not be found.");
 		
 		//Add global container
-		this.add(new Container());
+		this.global = new Container();
 		
 		this.continuation = false;
 		int lineNum = 0;
@@ -54,21 +55,25 @@ public class Configuration extends ArrayList<INode> {
 				if(COMMENT_LINE.matcher(line).matches())
 					continue;
 				
-				log.fine("Parsing: "+ line +" (line "+ lineNum +" from "+ path +")");
+				log.info("Parsing: "+ line +" (line "+ lineNum +" from "+ path +")");
 				addLine(line);
 			}
 		}
+		
+		serverRoot = new File(path).getParent();
+		for(INode node : global.search("ServerRoot"))
+			serverRoot = ((Directive)node).getValuesAsString();
 		
 		if(includeFiles)  {
 			ArrayList<INode> includes = this.getNodesByName("Include");
 			log.info("Parsing additional/included configuration(s): "+ includes.size());
 			for(INode include : includes)  {
-				Configuration c = Configuration.getInstance(((Directive)include).getValuesAsString(), includeFiles);
-				this.addAll(c);
+				Configuration c = Configuration.getInstance(serverRoot +"/"+ ((Directive)include).getValuesAsString(), includeFiles);
+				global.addAll(c.getGlobal());
 			}
 		}
 		
-		log.fine("Completed reading/parsing configuration file at '"+ path +"'. Read "+ lineNum +" line(s).");
+		log.info("Completed reading/parsing configuration file at '"+ path +"'. Read "+ lineNum +" line(s).");
 	}
 	
 	/**
@@ -77,16 +82,19 @@ public class Configuration extends ArrayList<INode> {
 	 * @return Container
 	 */
 	private Container getLastContainer()  {
-		Container root = (Container)this.get(0);
 		Container lContainer = null;
 		
-		for(INode node : root)  {
+		for(INode node : global)  {
 			if(!node.isDirective() && ((Container)node).isOpen())  {
 				lContainer = (Container)node;
 			}
 		}
 		
-		return (lContainer != null) ? lContainer : root;
+		return (lContainer != null) ? lContainer : global;
+	}
+	
+	public Container getGlobal()  {
+		return this.global;
 	}
 	
 	/**
@@ -101,8 +109,10 @@ public class Configuration extends ArrayList<INode> {
 	 */
 	private ArrayList<INode> getNodesByName(String name)  {
 		ArrayList<INode> nodes = new ArrayList<INode>();
-		for(INode node : (Container)this.get(0))  {
-			if(node.getName().equals(name))
+		for(INode node : global)  {
+			if(!node.isDirective())
+				nodes.addAll(node.search(name));
+			else if(node.getName().equals(name))
 				nodes.add(node);
 			
 		}
@@ -113,7 +123,7 @@ public class Configuration extends ArrayList<INode> {
 	/**
 	 * Processes a line from the configuration file which is not a commented one.
 	 * 
- * @param line	A non-commented line within the configuration file.
+   * @param line	A non-commented line within the configuration file.
 	 */
 	private void addLine(String line)  {
 		if(line.length() == 0)
@@ -129,7 +139,7 @@ public class Configuration extends ArrayList<INode> {
 		
 		//If this is a continuation of another line...
 		if(continuation)  {
-			INode n = this.get(this.size() - 1);
+			INode n = this.getLastContainer();
 			log.info("Appending to directive/container: "+ n.getName());
 			if(n.isDirective())
 				((Directive)n).add(line);
@@ -153,9 +163,8 @@ public class Configuration extends ArrayList<INode> {
 			
 		}else if((m = DIRECTIVE_LINE.matcher(line)).matches())  {
 			node = new Directive(m.group(1));
-			if(m.groupCount() >= 1)
-				for(int i = 2; i < m.groupCount(); i++)
-					((Directive)node).add(m.group(i));
+			for(int i = 2; i < m.groupCount(); i++)
+				((Directive)node).add(m.group(i));
 			
 		}
 		
@@ -199,7 +208,7 @@ public class Configuration extends ArrayList<INode> {
 		LogManager.APP_NAME = "apache-check";
 		try  {
 			Configuration c = Configuration.getInstance(args[0]);
-			log.info("Parsed configuration successfully: "+ c.get(0).children().size() +" nodes.");
+			log.info("Parsed configuration successfully: "+ c.getGlobal().children().size() +" nodes.");
 			
 		}catch(Exception e) {
 			e.printStackTrace();

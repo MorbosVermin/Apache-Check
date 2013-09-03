@@ -93,4 +93,19 @@ public class Container extends ArrayList<INode> implements INode {
 		return this;
 	}
 
+	public ArrayList<INode> search(String name)  {
+		ArrayList<INode> res = new ArrayList<INode>();
+		for(INode node : this.children())  {
+			
+			if(!node.isDirective())
+				res.addAll(node.search(name));
+			
+			else if(node.getName().equals(name))
+				res.add(node);
+			
+		}
+		
+		return res;
+	}
+	
 }
